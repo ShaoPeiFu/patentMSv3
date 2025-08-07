@@ -1,0 +1,155 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// 用户表
+model User {
+  id          Int       @id @default(autoincrement())
+  username    String    @unique
+  email       String    @unique
+  password    String
+  realName    String
+  phone       String?
+  department  String?
+  role        String    @default("USER")
+  avatar      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+
+  // 关联
+  createdPatents    Patent[]         @relation("CreatedBy")
+  updatedPatents    Patent[]         @relation("UpdatedBy")
+  uploadedDocuments PatentDocument[] @relation("UploadedBy")
+
+  @@map("users")
+}
+
+// 专利分类表
+model PatentCategory {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  parentId    Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联
+  parent   PatentCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children PatentCategory[] @relation("CategoryHierarchy")
+  patents  Patent[]
+
+  @@map("patent_categories")
+}
+
+// 专利表
+model Patent {
+  id                Int       @id @default(autoincrement())
+  title             String
+  description       String
+  patentNumber      String    @unique
+  applicationNumber String    @unique
+  applicationDate   DateTime
+  publicationDate   DateTime?
+  grantDate         DateTime?
+  expirationDate    DateTime?
+  status            String    @default("PENDING")
+  type              String
+  categoryId        Int
+  priorityDate      DateTime?
+  priorityCountry   String?
+  legalStatus       String
+  abstract          String
+  claims            String // SQLite中存储为JSON字符串
+  technicalField    String
+  keywords          String // SQLite中存储为JSON字符串
+  applicants        String // SQLite中存储为JSON字符串
+  inventors         String // SQLite中存储为JSON字符串
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         Int
+  updatedBy         Int
+
+  // 关联
+  category  PatentCategory   @relation(fields: [categoryId], references: [id])
+  creator   User             @relation("CreatedBy", fields: [createdBy], references: [id])
+  updater   User             @relation("UpdatedBy", fields: [updatedBy], references: [id])
+  documents PatentDocument[]
+  fees      PatentFee[]
+  events    PatentEvent[]
+
+  @@map("patents")
+}
+
+// 专利文档表
+model PatentDocument {
+  id         Int      @id @default(autoincrement())
+  patentId   Int
+  name       String
+  type       String
+  fileUrl    String
+  fileSize   Int
+  uploadedAt DateTime @default(now())
+  uploadedBy Int
+
+  // 关联
+  patent   Patent @relation(fields: [patentId], references: [id], onDelete: Cascade)
+  uploader User   @relation("UploadedBy", fields: [uploadedBy], references: [id])
+
+  @@map("patent_documents")
+}
+
+// 专利费用表
+model PatentFee {
+  id          Int       @id @default(autoincrement())
+  patentId    Int
+  type        String
+  amount      Float // SQLite使用Float而不是Decimal
+  currency    String    @default("CNY")
+  dueDate     DateTime
+  paidDate    DateTime?
+  status      String    @default("PENDING")
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // 关联
+  patent Patent @relation(fields: [patentId], references: [id], onDelete: Cascade)
+
+  @@map("patent_fees")
+}
+
+// 专利事件表
+model PatentEvent {
+  id          Int      @id @default(autoincrement())
+  patentId    Int
+  type        String
+  title       String
+  description String
+  date        DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联
+  patent Patent @relation(fields: [patentId], references: [id], onDelete: Cascade)
+
+  @@map("patent_events")
+}
+
+// 注意：SQLite不支持枚举类型，使用字符串代替
+// 用户角色: "USER", "ADMIN", "REVIEWER"
+// 专利状态: "PENDING", "APPROVED", "REJECTED", "EXPIRED", "MAINTAINED"
+// 专利类型: "INVENTION", "UTILITY_MODEL", "DESIGN", "SOFTWARE"
+// 文档类型: "APPLICATION", "PUBLICATION", "GRANT", "AMENDMENT", "OTHER"
+// 费用类型: "APPLICATION", "EXAMINATION", "GRANT", "MAINTENANCE", "OTHER"
+// 费用状态: "PENDING", "PAID", "OVERDUE"
+// 事件类型: "APPLICATION", "PUBLICATION", "EXAMINATION", "GRANT", "MAINTENANCE", "AMENDMENT"
